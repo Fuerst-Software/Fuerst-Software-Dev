@@ -1,32 +1,38 @@
-const ALLOWED_ORIGINS = new Set([
-  "https://fuerst-software.github.io/Fuerst-Software-Dev/",
+// KundenPortal/functions/_middleware.js
+const ALLOWED = new Set([
   "https://fuerst-software.github.io",
   "https://www.fuerst-software.com",
   "http://127.0.0.1:5500",
   "http://localhost:5500",
+  "http://127.0.0.1:8788",
+  "http://localhost:8788",
 ]);
 
-const BASE_HEADERS = {
-  "Access-Control-Allow-Credentials": "true",
-  "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Vary": "Origin",
+export const onRequestOptions = async ({ request }) => {
+  const origin = request.headers.get("Origin") || "";
+  const allowOrigin = ALLOWED.has(origin) ? origin : "";
+  const headers = new Headers();
+  if (allowOrigin) headers.set("Access-Control-Allow-Origin", allowOrigin);
+  headers.set("Access-Control-Allow-Credentials", "true");
+  headers.set("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
+  headers.set("Access-Control-Allow-Headers", "Content-Type");
+  headers.set("Vary", "Origin");
+  headers.set("Access-Control-Max-Age", "86400"); // 1 Tag
+  return new Response(null, { status: 204, headers });
 };
 
-export async function onRequest(context, next) {
-  const origin = context.request.headers.get("Origin") || "";
-  if (context.request.method === "OPTIONS") {
-    const h = new Headers(BASE_HEADERS);
-    if (ALLOWED_ORIGINS.has(origin)) h.set("Access-Control-Allow-Origin", origin);
-    return new Response(null, { status: 204, headers: h });
-  }
-
+export const onRequest = async ({ request, next }) => {
+  // Preflight oben schon abgefangen
   const res = await next();
-  const h = new Headers(res.headers);
-  Object.entries(BASE_HEADERS).forEach(([k, v]) => h.set(k, v));
-  if (ALLOWED_ORIGINS.has(origin)) h.set("Access-Control-Allow-Origin", origin);
 
-  return new Response(res.body, { status: res.status, headers: h });
-}
+  // CORS-Header an JEDE Antwort hängen
+  const origin = request.headers.get("Origin") || "";
+  const allowOrigin = ALLOWED.has(origin) ? origin : "";
+  const headers = new Headers(res.headers);
 
+  if (allowOrigin) headers.set("Access-Control-Allow-Origin", allowOrigin);
+  headers.set("Access-Control-Allow-Credentials", "true");
+  headers.set("Vary", "Origin");
 
+  return new Response(res.body, { status: res.status, headers });
+};
