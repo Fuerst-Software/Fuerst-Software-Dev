@@ -358,5 +358,8 @@
     }
   })();
 
+  })(); // <— IIFE sauber geschlossen
+
+
 
 
