@@ -1,46 +1,30 @@
-// Globales CORS für alle API-Routen (Whitelist + Credentials)
 const ALLOWED_ORIGINS = new Set([
+  "https://<DEIN-PROJEKTNAME>.pages.dev",
+  "https://fuerst-software.github.io",
   "https://www.fuerst-software.com",
-  "https://fuerst-software.com",
-  // Zum Debuggen optional:
-  "https://fuerst-software.pages.dev",
+  "http://127.0.0.1:5500",
+  "http://localhost:5500",
 ]);
 
-function corsHeaders(origin, extra = {}) {
-  return {
-    "access-control-allow-origin": origin,
-    "access-control-allow-credentials": "true",
-    "vary": "origin",
-    ...extra,
-  };
+const BASE_HEADERS = {
+  "Access-Control-Allow-Credentials": "true",
+  "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Vary": "Origin",
+};
+
+export async function onRequest(context, next) {
+  const origin = context.request.headers.get("Origin") || "";
+  if (context.request.method === "OPTIONS") {
+    const h = new Headers(BASE_HEADERS);
+    if (ALLOWED_ORIGINS.has(origin)) h.set("Access-Control-Allow-Origin", origin);
+    return new Response(null, { status: 204, headers: h });
+  }
+
+  const res = await next();
+  const h = new Headers(res.headers);
+  Object.entries(BASE_HEADERS).forEach(([k, v]) => h.set(k, v));
+  if (ALLOWED_ORIGINS.has(origin)) h.set("Access-Control-Allow-Origin", origin);
+
+  return new Response(res.body, { status: res.status, headers: h });
 }
-
-export const onRequestOptions = async ({ request }) => {
-  const origin = request.headers.get("Origin") || "";
-  const reqHeaders = request.headers.get("Access-Control-Request-Headers") || "content-type,authorization";
-  if (!ALLOWED_ORIGINS.has(origin)) {
-    // trotzdem sauber antworten, aber ohne Erlaubnis
-    return new Response(null, { status: 204 });
-  }
-  return new Response(null, {
-    headers: corsHeaders(origin, {
-      "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
-      "access-control-allow-headers": reqHeaders,
-      "access-control-max-age": "86400",
-    }),
-  });
-};
-
-export const onRequest = async ({ request, next }) => {
-  const resp = await next();
-  const origin = request.headers.get("Origin") || "";
-  if (!ALLOWED_ORIGINS.has(origin)) return resp;
-
-  const res = new Response(resp.body, resp);
-  const h = corsHeaders(origin);
-  for (const [k, v] of Object.entries(h)) res.headers.set(k, v);
-  if (!res.headers.get("content-type")) {
-    res.headers.set("content-type", "application/json; charset=utf-8");
-  }
-  return res;
-};
