@@ -1,5 +1,5 @@
 const ALLOWED_ORIGINS = new Set([
-  "https://<DEIN-PROJEKTNAME>.pages.dev",
+  "https://fuerstsoftwaredev.pages.dev",
   "https://fuerst-software.github.io",
   "https://www.fuerst-software.com",
   "http://127.0.0.1:5500",
@@ -28,3 +28,4 @@ export async function onRequest(context, next) {
 
   return new Response(res.body, { status: res.status, headers: h });
 }
+
