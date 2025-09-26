@@ -10,7 +10,7 @@ const API_BASE =
     : "https://fuerst-software-dev.pages.dev"; // deine Cloudflare Pages URL
 
 
-  const API_BASE = "https://fuerst-software.pages.dev"; // oder https://api.fuerst-software.com
+
   const API = {
     login:        () => `${API_BASE}/api/auth/login`,
     me:           () => `${API_BASE}/api/auth/me`,
@@ -347,6 +347,7 @@ const API_BASE =
   });
   (()=>{ const t = localStorage.getItem("ffportal:theme"); if(t==="dark"){ document.documentElement.classList.add("dark-mode"); el.darkToggle && (el.darkToggle.textContent="☀️ Light"); }})();
 })();
+
 
 
 
