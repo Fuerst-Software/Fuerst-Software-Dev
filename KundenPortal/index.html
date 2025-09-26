@@ -1,27 +1,394 @@
-<!-- Admin & Mitarbeiter: Team-Chat -->
-<li class="nav-item d-none role-admin role-mitarbeiter">
-  <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-team-chat" type="button">
-    Team-Chat
-  </button>
-</li>
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KundenPortal – Fürst Software & Web Development</title>
+  <link rel="icon" href="logo.png" />
+  <meta name="description" content="KundenPortal mit Rollen-Login (Admin, Mitarbeiter, Kunde) – Chat, Dateien, Buchhaltung." />
+  <meta name="theme-color" content="#fdfdfd" />
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="visually-hidden-focusable skip-link" href="#main">Zum Inhalt springen</a>
 
-<!-- Admin: Buchhaltung -->
-<li class="nav-item d-none role-admin role-mitarbeiter">
-  <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-accounting" type="button">
-    Buchhaltung
-  </button>
-</li>
+  <!-- NAV -->
+  <nav class="navbar navbar-expand-lg navbar-light ff-nav" aria-label="Hauptnavigation">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-3" href="#" aria-label="Startseite">
+        <img class="ff-logo-img" src="logo.png" alt="Logo" height="40">
+        <div class="brand-text">
+          <div class="brand-title">Fürst Software & Web Development</div>
+          <div class="brand-sub">KundenPortal</div>
+        </div>
+      </a>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <button id="darkToggle" class="btn btn-outline-secondary btn-round" type="button" aria-pressed="false">🌙 Dark</button>
+        <span id="userBadge" class="badge text-bg-light d-none"></span>
+        <button id="logoutBtn" class="btn btn-outline-dark btn-round d-none" type="button">Logout</button>
+      </div>
+    </div>
+  </nav>
 
-<!-- Admin & Mitarbeiter: Ablage -->
-<li class="nav-item d-none role-admin role-mitarbeiter">
-  <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-vault" type="button">
-    Ablage
-  </button>
-</li>
+  <main id="main" class="container py-4">
+    <!-- Hinweise -->
+    <div class="alert alert-warning small mb-3">
+      Dieses Portal nutzt eine sichere API (Cloudflare) und speichert Daten in einer D1-Datenbank. Bitte keine sensiblen Echtdaten in der Demo.
+    </div>
 
-<!-- Kunde: Support-Chat -->
-<li class="nav-item d-none role-kunde">
-  <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-support-chat" type="button">
-    Support-Chat
-  </button>
-</li>
+    <!-- LOGIN -->
+    <section id="view-login" class="section">
+      <div class="row justify-content-center">
+        <div class="col-md-6">
+          <div class="card ff-card">
+            <div class="card-body">
+              <h1 class="h4 mb-3 section-title">Login</h1>
+              <form id="loginForm" novalidate>
+                <div class="mb-3">
+                  <label for="lg-user" class="form-label small">Benutzername</label>
+                  <input id="lg-user" name="user" class="form-control ff-input" required autocomplete="username">
+                  <div class="invalid-feedback">Bitte Benutzername eingeben.</div>
+                </div>
+                <div class="mb-3">
+                  <label for="lg-pass" class="form-label small">Passwort</label>
+                  <input id="lg-pass" name="pass" type="password" class="form-control ff-input" required autocomplete="current-password">
+                  <div class="invalid-feedback">Bitte Passwort eingeben.</div>
+                </div>
+                <div class="d-grid">
+                  <button class="btn btn-light btn-cta" type="submit">Anmelden</button>
+                </div>
+              </form>
+              <p class="small text-muted mt-3 mb-0">Rollen: <code>admin</code>, <code>mitarbeiter</code>, <code>kunde</code></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- APP -->
+    <section id="view-app" class="section d-none">
+      <!-- Tabs -->
+      <ul class="nav nav-pills ff-tabs mb-3" id="roleTabs" role="tablist">
+        <!-- Admin -->
+        <li class="nav-item d-none role-admin"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-admin-overview" type="button">Admin – Übersicht</button></li>
+        <li class="nav-item d-none role-admin"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-admin-customers" type="button">Kunden & Dienste</button></li>
+        <li class="nav-item d-none role-admin"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-admin-requests" type="button">Anfragen</button></li>
+        <li class="nav-item d-none role-admin"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-admin-teamchat" type="button">Team-Chat</button></li>
+        <li class="nav-item d-none role-admin"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-admin-files" type="button">Dateien</button></li>
+        <li class="nav-item d-none role-admin"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-admin-accounting" type="button">Buchhaltung</button></li>
+
+        <!-- Mitarbeiter -->
+        <li class="nav-item d-none role-mitarbeiter"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-desk" type="button">Schreibtisch</button></li>
+        <li class="nav-item d-none role-mitarbeiter"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-desk-categories" type="button">Kategorien</button></li>
+        <li class="nav-item d-none role-mitarbeiter"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-teamchat" type="button">Team-Chat</button></li>
+        <li class="nav-item d-none role-mitarbeiter"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-accounting" type="button">Buchhaltung</button></li>
+
+        <!-- Kunde -->
+        <li class="nav-item d-none role-kunde"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-cust-overview" type="button">Meine Übersicht</button></li>
+        <li class="nav-item d-none role-kunde"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-cust-request" type="button">Neue Anfrage</button></li>
+        <li class="nav-item d-none role-kunde"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-cust-messages" type="button">Nachrichten</button></li>
+      </ul>
+
+      <div class="tab-content">
+        <!-- ADMIN: Übersicht -->
+        <div id="tab-admin-overview" class="tab-pane fade role-admin">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="card ff-card"><div class="card-body">
+                <h2 class="h6 mb-2">Kennzahlen</h2>
+                <ul class="small text-muted mb-0 bullets--dots">
+                  <li><strong><span data-kp="statCustomers">0</span></strong> Kunden</li>
+                  <li><strong><span data-kp="statServices">0</span></strong> aktive Dienste</li>
+                  <li><strong><span data-kp="statRequests">0</span></strong> offene Anfragen</li>
+                </ul>
+              </div></div>
+            </div>
+            <div class="col-md-8">
+              <div class="card ff-card"><div class="card-body">
+                <h2 class="h6 mb-2">Letzte Aktivitäten</h2>
+                <div id="admin-activity" class="small text-muted"></div>
+              </div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ADMIN: Kunden & Dienste -->
+        <div id="tab-admin-customers" class="tab-pane fade role-admin">
+          <div class="card ff-card mb-3"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h2 class="h6 mb-0">Kunden</h2>
+              <div class="d-flex gap-2">
+                <button id="btnAddCustomer" class="btn btn-sm btn-outline-dark" type="button">+ Kunde</button>
+                <button id="btnExportCustomers" class="btn btn-sm btn-outline-dark" type="button">CSV Export</button>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead><tr><th>Name</th><th>E-Mail</th><th>Dienste</th><th class="text-end">Aktion</th></tr></thead>
+                <tbody id="tblCustomers"></tbody>
+              </table>
+            </div>
+          </div></div>
+
+          <div class="card ff-card"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h2 class="h6 mb-0">Dienste</h2>
+              <button id="btnAddService" class="btn btn-sm btn-outline-dark" type="button">+ Dienst</button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead><tr><th>Titel</th><th>Beschreibung</th><th class="text-end">Aktion</th></tr></thead>
+                <tbody id="tblServices"></tbody>
+              </table>
+            </div>
+          </div></div>
+        </div>
+
+        <!-- ADMIN: Anfragen -->
+        <div id="tab-admin-requests" class="tab-pane fade role-admin">
+          <div class="card ff-card"><div class="card-body">
+            <h2 class="h6 mb-2">Anfragen</h2>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead><tr><th>Von</th><th>Typ</th><th>Priorität</th><th>Deadline</th><th>Beschreibung</th><th class="text-end">Status</th></tr></thead>
+                <tbody id="tblRequests"></tbody>
+              </table>
+            </div>
+          </div></div>
+        </div>
+
+        <!-- ADMIN: Team-Chat -->
+        <div id="tab-admin-teamchat" class="tab-pane fade role-admin">
+          <div class="card ff-card"><div class="card-body">
+            <h2 class="h6 mb-2">Team-Chat (Admin & Mitarbeiter)</h2>
+            <div id="chatAdmin" class="chat-box" aria-live="polite"></div>
+            <form id="chatAdminForm" class="chat-form mt-2">
+              <input id="chatAdminText" class="form-control form-control-sm ff-input" placeholder="Nachricht oder #tag …">
+              <div class="d-flex gap-2 mt-2">
+                <input id="chatAdminFile" type="file" class="form-control form-control-sm">
+                <button class="btn btn-sm btn-outline-dark" type="submit">Senden</button>
+              </div>
+            </form>
+          </div></div>
+        </div>
+
+        <!-- ADMIN: Dateien -->
+        <div id="tab-admin-files" class="tab-pane fade role-admin">
+          <div class="card ff-card"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h2 class="h6 mb-0">Datei-Ablage</h2>
+              <div class="d-flex gap-2">
+                <input id="fileTitle" class="form-control form-control-sm ff-input" placeholder="Titel (optional)">
+                <input id="fileUpload" type="file" class="form-control form-control-sm">
+                <button id="btnUploadFile" class="btn btn-sm btn-outline-dark" type="button">Hochladen</button>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead><tr><th>Datei</th><th>Uploader</th><th>Hinweis</th><th class="text-end">Aktion</th></tr></thead>
+                <tbody id="tblFiles"></tbody>
+              </table>
+            </div>
+          </div></div>
+        </div>
+
+        <!-- ADMIN: Buchhaltung -->
+        <div id="tab-admin-accounting" class="tab-pane fade role-admin">
+          <div class="card ff-card mb-3"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h2 class="h6 mb-0">Rechnungen</h2>
+              <div class="d-flex gap-2">
+                <button id="btnAddInvoice" class="btn btn-sm btn-outline-dark" type="button">+ Rechnung</button>
+                <button id="btnExportInvoices" class="btn btn-sm btn-outline-dark" type="button">CSV Export</button>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead><tr><th>Nr</th><th>Kunde</th><th>Datum</th><th>Betrag</th><th>Status</th><th class="text-end">Aktion</th></tr></thead>
+                <tbody id="tblInvoices"></tbody>
+              </table>
+            </div>
+          </div></div>
+
+          <div class="card ff-card"><div class="card-body">
+            <h2 class="h6 mb-2">Belege / Buchungen</h2>
+            <div class="d-flex gap-2 mb-2">
+              <input id="receiptTitle" class="form-control form-control-sm ff-input" placeholder="Beschreibung">
+              <input id="receiptAmount" type="number" step="0.01" class="form-control form-control-sm ff-input" placeholder="Betrag">
+              <button id="btnAddReceipt" class="btn btn-sm btn-outline-dark" type="button">+ Beleg</button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead><tr><th>Datum</th><th>Beschreibung</th><th>Betrag</th><th class="text-end">Aktion</th></tr></thead>
+                <tbody id="tblReceipts"></tbody>
+              </table>
+            </div>
+          </div></div>
+        </div>
+
+        <!-- MITARBEITER: Schreibtisch -->
+        <div id="tab-desk" class="tab-pane fade role-mitarbeiter">
+          <div class="row g-3">
+            <div class="col-lg-6">
+              <div class="card ff-card"><div class="card-body">
+                <h2 class="h6 mb-2">Notizen / Kommunikation</h2>
+                <div id="deskNotes" class="small text-muted mb-2" style="min-height:100px"></div>
+                <div class="d-flex gap-2">
+                  <input id="noteText" class="form-control form-control-sm ff-input" placeholder="Interne Notiz hinzufügen…">
+                  <button id="btnAddNote" class="btn btn-sm btn-outline-dark" type="button">+ Hinzufügen</button>
+                </div>
+              </div></div>
+            </div>
+            <div class="col-lg-6">
+              <div class="card ff-card"><div class="card-body">
+                <h2 class="h6 mb-2">Schnellablage</h2>
+                <div class="d-flex gap-2 mb-2">
+                  <input id="quickTitle" class="form-control form-control-sm ff-input" placeholder="Titel">
+                  <input id="quickInfo" class="form-control form-control-sm ff-input" placeholder="Info">
+                  <button id="btnQuickAdd" class="btn btn-sm btn-outline-dark" type="button">+ Ablegen</button>
+                </div>
+                <div id="quickList" class="small text-muted"></div>
+              </div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MITARBEITER: Kategorien -->
+        <div id="tab-desk-categories" class="tab-pane fade role-mitarbeiter">
+          <div class="card ff-card"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h2 class="h6 mb-0">Kategorien</h2>
+              <div class="d-flex gap-2">
+                <input id="catTitle" class="form-control form-control-sm ff-input" placeholder="Neue Kategorie">
+                <button id="btnAddCategory" class="btn btn-sm btn-outline-dark" type="button">+ Kategorie</button>
+              </div>
+            </div>
+            <div id="catList" class="row g-2"></div>
+          </div></div>
+        </div>
+
+        <!-- MITARBEITER: Team-Chat -->
+        <div id="tab-teamchat" class="tab-pane fade role-mitarbeiter">
+          <div class="card ff-card"><div class="card-body">
+            <h2 class="h6 mb-2">Team-Chat</h2>
+            <div id="chatTeam" class="chat-box" aria-live="polite"></div>
+            <form id="chatTeamForm" class="chat-form mt-2">
+              <input id="chatTeamText" class="form-control form-control-sm ff-input" placeholder="Nachricht …">
+              <div class="d-flex gap-2 mt-2">
+                <input id="chatTeamFile" type="file" class="form-control form-control-sm">
+                <button class="btn btn-sm btn-outline-dark" type="submit">Senden</button>
+              </div>
+            </form>
+          </div></div>
+        </div>
+
+        <!-- MITARBEITER: Buchhaltung -->
+        <div id="tab-accounting" class="tab-pane fade role-mitarbeiter">
+          <div class="card ff-card"><div class="card-body">
+            <h2 class="h6 mb-2">Buchhaltung – Übersicht</h2>
+            <div class="small text-muted mb-2">Schnellzugriff auf Rechnungen/Belege.</div>
+            <div class="d-flex gap-2 mb-2">
+              <button id="btnAccLoad" class="btn btn-sm btn-outline-dark" type="button">Aktualisieren</button>
+              <button id="btnAccExport" class="btn btn-sm btn-outline-dark" type="button">CSV Export</button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead><tr><th>Typ</th><th>Datum</th><th>Beschreibung</th><th>Betrag</th></tr></thead>
+                <tbody id="tblAccounting"></tbody>
+              </table>
+            </div>
+          </div></div>
+        </div>
+
+        <!-- KUNDE: Übersicht -->
+        <div id="tab-cust-overview" class="tab-pane fade role-kunde">
+          <div class="card ff-card"><div class="card-body">
+            <h2 class="h6 mb-2">Meine Daten & Dienste</h2>
+            <div class="row g-3">
+              <div class="col-md-6"><div class="small text-muted"><strong>Kontakt</strong><div id="custContact"></div></div></div>
+              <div class="col-md-6"><div class="small text-muted"><strong>Aktive Dienste</strong><ul id="custServices" class="small mb-0"></ul></div></div>
+            </div>
+          </div></div>
+        </div>
+
+        <!-- KUNDE: Neue Anfrage -->
+        <div id="tab-cust-request" class="tab-pane fade role-kunde">
+          <div class="card ff-card"><div class="card-body">
+            <h2 class="h6 mb-3">Neue Anfrage stellen</h2>
+            <form id="requestForm" class="row g-3" novalidate>
+              <div class="col-md-4">
+                <label class="form-label small" for="rqType">Typ</label>
+                <select id="rqType" class="form-select ff-input" required>
+                  <option value="">Bitte wählen…</option>
+                  <option>Inhaltsänderung</option>
+                  <option>Bug / Fehler</option>
+                  <option>Neues Feature</option>
+                  <option>SEO / Performance</option>
+                  <option>Design / UI</option>
+                </select>
+                <div class="invalid-feedback">Bitte Typ wählen.</div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small" for="rqPrio">Priorität</label>
+                <select id="rqPrio" class="form-select ff-input" required>
+                  <option value="">Bitte wählen…</option>
+                  <option>Niedrig</option>
+                  <option>Mittel</option>
+                  <option>Hoch</option>
+                </select>
+                <div class="invalid-feedback">Bitte Priorität wählen.</div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small" for="rqDue">Deadline</label>
+                <input id="rqDue" type="date" class="form-control ff-input" required>
+                <div class="invalid-feedback">Bitte Datum setzen.</div>
+              </div>
+              <div class="col-12">
+                <label class="form-label small" for="rqDesc">Beschreibung (konkret)</label>
+                <textarea id="rqDesc" rows="4" class="form-control ff-input" placeholder="Was genau soll geändert werden? Wo auf der Seite? ggf. URLs, Screenshots…" required></textarea>
+                <div class="invalid-feedback">Bitte Beschreibung hinzufügen.</div>
+              </div>
+              <div class="col-12">
+                <button class="btn btn-light btn-cta" type="submit">Anfrage absenden</button>
+              </div>
+            </form>
+          </div></div>
+        </div>
+
+        <!-- KUNDE: Nachrichten -->
+        <div id="tab-cust-messages" class="tab-pane fade role-kunde">
+          <div class="card ff-card"><div class="card-body">
+            <h2 class="h6 mb-2">Nachrichten an Support</h2>
+            <div id="chatCustomer" class="chat-box" aria-live="polite"></div>
+            <form id="chatCustomerForm" class="chat-form mt-2">
+              <input id="chatCustomerText" class="form-control form-control-sm ff-input" placeholder="Nachricht …">
+              <div class="d-flex gap-2 mt-2">
+                <input id="chatCustomerFile" type="file" class="form-control form-control-sm">
+                <button class="btn btn-sm btn-outline-dark" type="submit">Senden</button>
+              </div>
+            </form>
+          </div></div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <footer class="ff-footer border-top" role="contentinfo">
+    <div class="container d-flex justify-content-between align-items-center py-3">
+      <div class="small text-muted">© <span id="year"></span> Fürst Software & Web Development</div>
+      <div class="small text-muted">KundenPortal</div>
+    </div>
+  </footer>
+
+  <div id="toast" class="ff-toast" role="status" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
