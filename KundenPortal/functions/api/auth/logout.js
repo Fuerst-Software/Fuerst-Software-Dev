@@ -8,8 +8,6 @@ const ok = (data, cookie) =>
   });
 
 export const onRequestPost = async () => {
-  // Cookie invalidieren
-  const expired =
-    "ff_sess=; Path=/; HttpOnly; Secure; SameSite=None; Expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  const expired = "ff_sess=; Path=/; HttpOnly; Secure; SameSite=None; Expires=Thu, 01 Jan 1970 00:00:00 GMT";
   return ok({ ok: true }, expired);
 };
