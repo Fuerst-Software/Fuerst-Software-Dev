@@ -3,7 +3,7 @@
 // ----------------------------------------
 
 // Cloudflare Pages Domain hier eintragen (dein Project Name)
-const CF_BASE = "https://<DEIN-PROJEKTNAME>.pages.dev";
+const CF_BASE = "https://fuerstsoftwaredev.pages.dev";
 
 const API_BASE =
   (location.hostname === "127.0.0.1" || location.hostname === "localhost")
@@ -350,4 +350,5 @@ const API_BASE =
   });
   (()=>{ const t = localStorage.getItem("ffportal:theme"); if(t==="dark"){ document.documentElement.classList.add("dark-mode"); el.darkToggle && (el.darkToggle.textContent="☀️ Light"); }})();
 })();
+
 
