@@ -1,6 +1,15 @@
 // ----------------------------------------
 // KundenPortal – Cloudflare API Version
 // ----------------------------------------
+
+// Cloudflare Pages Domain hier eintragen (dein Project Name)
+const CF_BASE = "https://<DEIN-PROJEKTNAME>.pages.dev";
+
+const API_BASE =
+  (location.hostname === "127.0.0.1" || location.hostname === "localhost")
+    ? "http://127.0.0.1:8788"     // für lokalen Wrangler-Test (optional)
+    : CF_BASE;
+
 (() => {
   "use strict";
 
@@ -341,3 +350,4 @@
   });
   (()=>{ const t = localStorage.getItem("ffportal:theme"); if(t==="dark"){ document.documentElement.classList.add("dark-mode"); el.darkToggle && (el.darkToggle.textContent="☀️ Light"); }})();
 })();
+
