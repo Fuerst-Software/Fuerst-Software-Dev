@@ -3,16 +3,12 @@
 // ----------------------------------------
 
 // Cloudflare Pages Domain hier eintragen (dein Project Name)
-const API_BASE = "fuerst-software-dev.pages.dev"; // <— deine Pages-URL
-
-
+// Basis-URL der API
 const API_BASE =
   (location.hostname === "127.0.0.1" || location.hostname === "localhost")
-    ? "http://127.0.0.1:8788"     // für lokalen Wrangler-Test (optional)
-    : CF_BASE;
+    ? "http://127.0.0.1:8788" // Local Wrangler-Test
+    : "https://fuerst-software-dev.pages.dev"; // deine Cloudflare Pages URL
 
-(() => {
-  "use strict";
 
   const API_BASE = "https://fuerst-software.pages.dev"; // oder https://api.fuerst-software.com
   const API = {
@@ -351,6 +347,7 @@ const API_BASE =
   });
   (()=>{ const t = localStorage.getItem("ffportal:theme"); if(t==="dark"){ document.documentElement.classList.add("dark-mode"); el.darkToggle && (el.darkToggle.textContent="☀️ Light"); }})();
 })();
+
 
 
 
