@@ -3,7 +3,7 @@
 // ----------------------------------------
 
 // Cloudflare Pages Domain hier eintragen (dein Project Name)
-const API_BASE = "https://fuerst-software-dev.pages.dev"; // <— deine Pages-URL
+const API_BASE = "https://fuerst-software.github.io/Fuerst-Software-Dev/"; // <— deine Pages-URL
 
 
 const API_BASE =
