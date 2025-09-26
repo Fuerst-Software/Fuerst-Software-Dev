@@ -2,28 +2,29 @@
 // KundenPortal – Cloudflare API Version
 // ----------------------------------------
 
-// Cloudflare Pages Domain hier eintragen (dein Project Name)
-// Basis-URL der API
-const API_BASE =
-  (location.hostname === "127.0.0.1" || location.hostname === "localhost")
-    ? "http://127.0.0.1:8788" // Local Wrangler-Test
-    : "https://fuerst-software-dev.pages.dev"; // deine Cloudflare Pages URL
+(() => {
+  "use strict";
 
-
+  // Cloudflare Pages Domain hier eintragen
+  // Lokal (localhost/127.0.0.1) -> Wrangler; sonst -> Pages
+  const API_BASE =
+    (location.hostname === "127.0.0.1" || location.hostname === "localhost")
+      ? "http://127.0.0.1:8788" // Local Wrangler-Test
+      : "https://fuerst-software-dev.pages.dev"; // deine Cloudflare Pages URL
 
   const API = {
-    login:        () => `${API_BASE}/api/auth/login`,
-    me:           () => `${API_BASE}/api/auth/me`,
-    customers:    () => `${API_BASE}/api/customers`,
-    services:     () => `${API_BASE}/api/services`,
-    requests:     () => `${API_BASE}/api/requests`,
-    notes:        () => `${API_BASE}/api/notes`,
-    cats:         () => `${API_BASE}/api/cats`,
-    quick:        () => `${API_BASE}/api/quick`,
+    login:     () => `${API_BASE}/api/auth/login`,
+    me:        () => `${API_BASE}/api/auth/me`,
+    customers: () => `${API_BASE}/api/customers`,
+    services:  () => `${API_BASE}/api/services`,
+    requests:  () => `${API_BASE}/api/requests`,
+    notes:     () => `${API_BASE}/api/notes`,
+    cats:      () => `${API_BASE}/api/cats`,
+    quick:     () => `${API_BASE}/api/quick`,
   };
 
   // ---------- DOM ----------
-  const $ = (s, r=document) => r.querySelector(s);
+  const $  = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
   const el = {
     loginForm: $("#loginForm"),
@@ -81,24 +82,28 @@ const API_BASE =
   let currentRole = null;
 
   // ---------- Helpers: Fetch ----------
-  const jget  = (url, opts={}) => fetch(url, { credentials:"include", ...opts }).then(r=> {
-    if(!r.ok) throw new Error(`GET ${url} -> ${r.status}`);
-    return r.json();
-  });
-  const jpost = (url, data, opts={}) => fetch(url, {
-    method:"POST",
-    headers:{ "content-type":"application/json", ...(opts.headers||{}) },
-    body: JSON.stringify(data),
-    credentials:"include",
-    ...opts
-  }).then(r=>{
-    if(!r.ok) return r.json().catch(()=>({error:""})).then(j=>{ throw new Error(j.error || `POST ${url} -> ${r.status}`); });
-    return r.json();
-  });
-  const jdel  = (url, opts={}) => fetch(url, { method:"DELETE", credentials:"include", ...opts }).then(r=>{
-    if(!r.ok) throw new Error(`DELETE ${url} -> ${r.status}`);
-    return r.json();
-  });
+  const jget  = (url, opts={}) =>
+    fetch(url, { credentials:"include", ...opts })
+      .then(r => { if(!r.ok) throw new Error(`GET ${url} -> ${r.status}`); return r.json(); });
+
+  const jpost = (url, data, opts={}) =>
+    fetch(url, {
+      method: "POST",
+      headers: { "content-type":"application/json", ...(opts.headers||{}) },
+      body: JSON.stringify(data),
+      credentials: "include",
+      ...opts
+    }).then(async r => {
+      if(!r.ok){
+        let j=null; try{ j = await r.json(); }catch{}
+        throw new Error(j?.error || `POST ${url} -> ${r.status}`);
+      }
+      return r.json();
+    });
+
+  const jdel  = (url, opts={}) =>
+    fetch(url, { method:"DELETE", credentials:"include", ...opts })
+      .then(r => { if(!r.ok) throw new Error(`DELETE ${url} -> ${r.status}`); return r.json(); });
 
   // ---------- Auth ----------
   const enterApp = (user, role) => {
@@ -124,9 +129,9 @@ const API_BASE =
   const checkSession = async () => {
     try {
       const me = await jget(API.me());
-      enterApp(me.user, me.role);
+      if (me?.user && me?.role) enterApp(me.user, me.role);
     } catch {
-      // keine Session: Login-View bleibt
+      // keine Session: Login-View bleibt sichtbar
     }
   };
 
@@ -140,13 +145,15 @@ const API_BASE =
       enterApp(res.user, res.role);
       showToast("Willkommen, " + res.user);
     } catch (err) {
+      console.error(err);
       showToast("Login fehlgeschlagen", false);
     }
   });
 
-  el.logoutBtn?.addEventListener("click", () => {
-    // Session-Cookie „löschen“: kurzer Trick – abgelaufenes Cookie setzen
-    document.cookie = `ff_sess=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict; Secure`;
+  el.logoutBtn?.addEventListener("click", async () => {
+    try { await jpost(`${API_BASE}/api/auth/logout`, {}); } catch {}
+    // falls Cookie nicht gelöscht wurde – Fallback
+    document.cookie = `ff_sess=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=None; Secure`;
     location.reload();
   });
 
@@ -275,7 +282,6 @@ const API_BASE =
   async function renderCustomerView(){
     if (!el.custContact || !el.custServices) return;
     el.custContact.textContent = `${currentUser}@mail.com`;
-    // Services als einfache Liste anzeigen
     const services = await jget(API.services());
     el.custServices.innerHTML = services.map(s => `<li>${h(s.title)}</li>`).join("");
   }
@@ -302,7 +308,7 @@ const API_BASE =
     el.adminActivity.innerHTML = all.map(a=>`<div>• ${new Date(a.dateISO).toLocaleString()}: ${h(a.txt)}</div>`).join("");
   }
 
-  // ---------- Delete Delegation (Customers/Services) ----------
+  // ---------- Delete Delegation ----------
   document.addEventListener("click", async (e)=>{
     const btn = e.target.closest("[data-act]");
     if(!btn) return;
@@ -318,7 +324,6 @@ const API_BASE =
 
   // ---------- Render All ----------
   async function renderAll(){
-    // paralleles Laden
     await Promise.all([
       loadCustomers(),
       loadServices(),
@@ -333,7 +338,7 @@ const API_BASE =
   }
 
   // Periodischer Refresh für Admin
-  setInterval(async ()=>{ 
+  setInterval(async ()=>{
     if (currentRole === "admin" && !el.appView?.classList.contains("d-none")) {
       await Promise.all([loadRequests(), loadNotes(), renderStats(), renderActivity()]);
     }
@@ -345,12 +350,12 @@ const API_BASE =
     el.darkToggle.textContent = document.documentElement.classList.contains("dark-mode") ? "☀️ Light" : "🌙 Dark";
     localStorage.setItem("ffportal:theme", document.documentElement.classList.contains("dark-mode") ? "dark" : "light");
   });
-  (()=>{ const t = localStorage.getItem("ffportal:theme"); if(t==="dark"){ document.documentElement.classList.add("dark-mode"); el.darkToggle && (el.darkToggle.textContent="☀️ Light"); }})();
-})();
+  (() => {
+    const t = localStorage.getItem("ffportal:theme");
+    if (t === "dark") {
+      document.documentElement.classList.add("dark-mode");
+      if (el.darkToggle) el.darkToggle.textContent = "☀️ Light";
+    }
+  })();
 
-
-
-
-
-
-
+})(); // <— IIFE sauber geschlossen
