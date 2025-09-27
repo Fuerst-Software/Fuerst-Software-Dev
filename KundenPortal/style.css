@@ -536,3 +536,56 @@
   checkSession();
 
 })();
+
+
+
+    /* ===== (deine bestehenden Styles bleiben wie gehabt) ===== */
+
+/* Chat UI */
+.chat-box {
+  height: 360px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--bg-2);
+}
+.chat-msg {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.chat-msg .avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--gold);
+  flex: 0 0 28px;
+}
+.chat-msg .bubble {
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 10px;
+  max-width: 70%;
+}
+.chat-msg.me .bubble {
+  background: rgba(191,169,76,0.12);
+  border-color: rgba(191,169,76,0.45);
+  margin-left: auto;
+}
+.chat-msg .meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Tables compact for accounting */
+#tblInvoices td, #tblInvoices th,
+#tblReceipts td, #tblReceipts th,
+#tblAccounting td, #tblAccounting th {
+  white-space: nowrap;
+}
+
+/* Upload button spacing small fix */
+#btnUploadFile { white-space: nowrap; }
+
+
