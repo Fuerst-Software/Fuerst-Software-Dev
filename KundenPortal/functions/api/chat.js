@@ -52,4 +52,3 @@ export const onRequestPost = async ({ request, env }) => {
 
   return ok({ ok: true });
 };
-
