@@ -1,38 +1,43 @@
-// KundenPortal/functions/_middleware.js
-const ALLOWED = new Set([
-  "https://fuerst-software.github.io",
-  "https://www.fuerst-software.com",
-  "http://127.0.0.1:5500",
-  "http://localhost:5500",
-  "http://127.0.0.1:8788",
-  "http://localhost:8788",
-]);
-
-export const onRequestOptions = async ({ request }) => {
+export async function onRequest(context) {
+  const { request } = context;
   const origin = request.headers.get("Origin") || "";
-  const allowOrigin = ALLOWED.has(origin) ? origin : "";
-  const headers = new Headers();
-  if (allowOrigin) headers.set("Access-Control-Allow-Origin", allowOrigin);
-  headers.set("Access-Control-Allow-Credentials", "true");
-  headers.set("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
-  headers.set("Access-Control-Allow-Headers", "Content-Type");
-  headers.set("Vary", "Origin");
-  headers.set("Access-Control-Max-Age", "86400"); // 1 Tag
-  return new Response(null, { status: 204, headers });
-};
 
-export const onRequest = async ({ request, next }) => {
-  // Preflight oben schon abgefangen
-  const res = await next();
+  // Erlaubte Frontends:
+  const ALLOW = new Set([
+    "https://fuerst-software.github.io",
+    "https://fuerst-software.github.io/Fuerst-Software-Dev",
+    "https://www.fuerst-software.com",
+    "https://fuerst-software-dev.pages.dev",
+    "http://127.0.0.1:5500",
+    "http://127.0.0.1:8788",
+    "http://localhost:5500",
+    "http://localhost:8788",
+  ]);
 
-  // CORS-Header an JEDE Antwort hängen
-  const origin = request.headers.get("Origin") || "";
-  const allowOrigin = ALLOWED.has(origin) ? origin : "";
-  const headers = new Headers(res.headers);
+  const corsHeaders = {
+    "Access-Control-Allow-Credentials": "true",
+    "Vary": "Origin",
+  };
+  if (ALLOW.has(origin)) {
+    corsHeaders["Access-Control-Allow-Origin"] = origin;
+  }
 
-  if (allowOrigin) headers.set("Access-Control-Allow-Origin", allowOrigin);
-  headers.set("Access-Control-Allow-Credentials", "true");
-  headers.set("Vary", "Origin");
+  // Preflight
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
+  }
 
-  return new Response(res.body, { status: res.status, headers });
-};
+  const resp = await context.next();
+
+  // bei JSON-Antworten CORS-Header injizieren
+  const newHeaders = new Headers(resp.headers);
+  Object.entries(corsHeaders).forEach(([k,v]) => newHeaders.set(k,v));
+  return new Response(resp.body, { status: resp.status, headers: newHeaders });
+}
