@@ -46,3 +46,544 @@
 
 /* Upload button spacing small fix */
 #btnUploadFile { white-space: nowrap; }
+
+// ----------------------------------------
+// KundenPortal – Cloudflare API Version (mit Chat/Files/Accounting)
+// ----------------------------------------
+(() => {
+  "use strict";
+
+  // API-Basis: lokal -> Wrangler; sonst -> Cloudflare Pages
+  const API_BASE =
+    (location.hostname === "127.0.0.1" || location.hostname === "localhost")
+      ? "http://127.0.0.1:8788"
+      : "https://fuerst-software-dev.pages.dev"; // <— deine Pages-URL
+
+  // Erwartete Endpoints (du kannst auf CF Functions so anlegen):
+  // Auth:        POST /api/auth/login, GET /api/auth/me, POST /api/auth/logout
+  // Core:        /api/customers (GET/POST/DELETE?id=...), /api/services, /api/requests, /api/notes, /api/cats, /api/quick
+  // Files:       GET/POST/DELETE /api/files
+  // Chat:        GET /api/chat?room=team|admin|customer&since=ISO, POST /api/chat  {room,text,fileId?}
+  // Accounting:  GET/POST/DELETE /api/invoices, GET/POST/DELETE /api/receipts
+  const API = {
+    // auth
+    login:        () => `${API_BASE}/api/auth/login`,
+    me:           () => `${API_BASE}/api/auth/me`,
+    logout:       () => `${API_BASE}/api/auth/logout`,
+    // core
+    customers:    () => `${API_BASE}/api/customers`,
+    services:     () => `${API_BASE}/api/services`,
+    requests:     () => `${API_BASE}/api/requests`,
+    notes:        () => `${API_BASE}/api/notes`,
+    cats:         () => `${API_BASE}/api/cats`,
+    quick:        () => `${API_BASE}/api/quick`,
+    // files
+    files:        () => `${API_BASE}/api/files`,
+    // chat
+    chat:         (room, since) => `${API_BASE}/api/chat?room=${encodeURIComponent(room)}${since ? `&since=${encodeURIComponent(since)}` : ""}`,
+    chatPost:     () => `${API_BASE}/api/chat`,
+    // accounting
+    invoices:     () => `${API_BASE}/api/invoices`,
+    receipts:     () => `${API_BASE}/api/receipts`,
+  };
+
+  // ---------- DOM ----------
+  const $  = (s, r=document) => r.querySelector(s);
+  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+  const el = {
+    // global
+    loginForm: $("#loginForm"), loginView: $("#view-login"), appView: $("#view-app"),
+    userBadge: $("#userBadge"), logoutBtn: $("#logoutBtn"), toastBox: $("#toast"),
+    year: $("#year"), darkToggle: $("#darkToggle"),
+    // admin core
+    tblCustomers: $("#tblCustomers"), tblServices: $("#tblServices"), btnAddCustomer: $("#btnAddCustomer"),
+    btnAddService: $("#btnAddService"), tblRequests: $("#tblRequests"), adminActivity: $("#admin-activity"),
+    btnExportCustomers: $("#btnExportCustomers"),
+    // mitarbeiter core
+    noteText: $("#noteText"), btnAddNote: $("#btnAddNote"), deskNotes: $("#deskNotes"),
+    quickTitle: $("#quickTitle"), quickInfo: $("#quickInfo"), btnQuickAdd: $("#btnQuickAdd"), quickList: $("#quickList"),
+    catTitle: $("#catTitle"), btnAddCategory: $("#btnAddCategory"), catList: $("#catList"),
+    // kunde core
+    custContact: $("#custContact"), custServices: $("#custServices"),
+    // requests
+    requestForm: $("#requestForm"), rqType: $("#rqType"), rqPrio: $("#rqPrio"), rqDue: $("#rqDue"), rqDesc: $("#rqDesc"),
+    // files
+    fileTitle: $("#fileTitle"), fileUpload: $("#fileUpload"), btnUploadFile: $("#btnUploadFile"), tblFiles: $("#tblFiles"),
+    // chat admin
+    chatAdmin: $("#chatAdmin"), chatAdminForm: $("#chatAdminForm"), chatAdminText: $("#chatAdminText"), chatAdminFile: $("#chatAdminFile"),
+    // chat mitarbeiter
+    chatTeam: $("#chatTeam"), chatTeamForm: $("#chatTeamForm"), chatTeamText: $("#chatTeamText"), chatTeamFile: $("#chatTeamFile"),
+    // chat customer
+    chatCustomer: $("#chatCustomer"), chatCustomerForm: $("#chatCustomerForm"), chatCustomerText: $("#chatCustomerText"), chatCustomerFile: $("#chatCustomerFile"),
+    // accounting admin
+    btnAddInvoice: $("#btnAddInvoice"), btnExportInvoices: $("#btnExportInvoices"), tblInvoices: $("#tblInvoices"),
+    receiptTitle: $("#receiptTitle"), receiptAmount: $("#receiptAmount"), btnAddReceipt: $("#btnAddReceipt"), tblReceipts: $("#tblReceipts"),
+    // accounting mitarbeiter quick overview
+    btnAccLoad: $("#btnAccLoad"), btnAccExport: $("#btnAccExport"), tblAccounting: $("#tblAccounting"),
+  };
+  if (el.year) el.year.textContent = new Date().getFullYear();
+
+  // ---------- Utils ----------
+  const h = (v) => String(v ?? "")
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#39;");
+  const showToast = (msg, ok=true) => {
+    if (!el.toastBox) return;
+    el.toastBox.textContent = msg;
+    el.toastBox.className = ok ? "ff-toast ok" : "ff-toast err";
+    el.toastBox.style.opacity = "1";
+    setTimeout(()=> { el.toastBox.style.opacity = "0"; }, 2500);
+  };
+  const downloadCSV = (rows, filename) => {
+    if (!rows?.length) return;
+    const header = Object.keys(rows[0]);
+    const lines = [header.join(",")].concat(rows.map(r => header.map(k => `"${String(r[k]??"").replaceAll('"','""')}"`).join(",")));
+    const blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ---------- State ----------
+  let currentUser = null;
+  let currentRole = null;
+
+  // ---------- Helpers: Fetch ----------
+  const jget  = (url, opts={}) =>
+    fetch(url, { credentials:"include", ...opts })
+      .then(r => { if (!r.ok) throw new Error(`GET ${url} -> ${r.status}`); return r.json(); });
+
+  const jpost = (url, data, opts={}) =>
+    fetch(url, {
+      method: "POST",
+      headers: { "content-type":"application/json", ...(opts.headers||{}) },
+      body: JSON.stringify(data),
+      credentials: "include",
+      ...opts
+    }).then(async r => {
+      if (!r.ok) { let j=null; try { j = await r.json(); } catch {} throw new Error(j?.error || `POST ${url} -> ${r.status}`); }
+      return r.json();
+    });
+
+  const jdel  = (url, opts={}) =>
+    fetch(url, { method:"DELETE", credentials:"include", ...opts })
+      .then(r => { if (!r.ok) throw new Error(`DELETE ${url} -> ${r.status}`); return r.json(); });
+
+  // Multipart (für Dateien)
+  const jpostForm = (url, formData, opts={}) =>
+    fetch(url, { method:"POST", body: formData, credentials:"include", ...opts })
+      .then(async r => {
+        if (!r.ok) { let t=await r.text().catch(()=> ""); throw new Error(t || `POST ${url} -> ${r.status}`); }
+        try { return r.json(); } catch { return {}; }
+      });
+
+  // ---------- Auth ----------
+  const enterApp = (user, role) => {
+    currentUser = user;
+    currentRole = role;
+    el.loginView?.classList.add("d-none");
+    el.appView?.classList.remove("d-none");
+    el.userBadge?.classList.remove("d-none");
+    el.logoutBtn?.classList.remove("d-none");
+    if (el.userBadge) el.userBadge.textContent = `${user} (${role})`;
+
+    const roleSel = `.role-${role}`;
+    $$(".nav-item").forEach(li => li.classList.add("d-none"));
+    $$(".tab-pane").forEach(p => p.classList.remove("show","active"));
+    $$(".nav-item"+roleSel).forEach(li => li.classList.remove("d-none"));
+    const firstPane = $$(".tab-pane"+roleSel)[0];
+    if (firstPane) firstPane.classList.add("show","active");
+    const firstNav = $(`.nav-item${roleSel} .nav-link`); firstNav?.classList.add("active");
+
+    bootRoleFeatures();
+    renderAll();
+  };
+
+  const checkSession = async () => {
+    try {
+      const me = await jget(API.me());
+      if (me?.user && me?.role) enterApp(me.user, me.role);
+    } catch { /* not logged in */ }
+  };
+
+  el.loginForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const username = $("#lg-user")?.value.trim();
+    const password = $("#lg-pass")?.value.trim();
+    if (!username || !password) { showToast("Bitte Zugangsdaten eingeben", false); return; }
+    try { const res = await jpost(API.login(), { username, password }); enterApp(res.user, res.role); showToast("Willkommen, " + res.user); }
+    catch (err) { console.error(err); showToast("Login fehlgeschlagen", false); }
+  });
+
+  el.logoutBtn?.addEventListener("click", async () => {
+    try { await jpost(API.logout(), {}); } catch {}
+    document.cookie = "ff_sess=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=None; Secure";
+    location.reload();
+  });
+
+  // ---------- Customers ----------
+  async function loadCustomers() {
+    if (!el.tblCustomers) return;
+    const data = await jget(API.customers());
+    el.tblCustomers.innerHTML = data.map(c => `
+      <tr>
+        <td>${h(c.name)}</td>
+        <td>${h(c.mail||"")}</td>
+        <td>${h(c.services_count||0)}</td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-dark" data-act="del-customer" data-id="${h(c.id)}">Löschen</button>
+        </td>
+      </tr>`).join("");
+  }
+  el.btnAddCustomer?.addEventListener("click", async () => {
+    const name = prompt("Kundenname?");
+    const mail = prompt("E-Mail?");
+    if (!name) return;
+    try { await jpost(API.customers(), { name, mail }); await loadCustomers(); showToast("Kunde angelegt"); }
+    catch { showToast("Kunde konnte nicht angelegt werden", false); }
+  });
+  el.btnExportCustomers?.addEventListener("click", async () => {
+    try { const rows = await jget(API.customers()); downloadCSV(rows, "kunden.csv"); }
+    catch { showToast("Export fehlgeschlagen", false); }
+  });
+
+  // ---------- Services ----------
+  async function loadServices() {
+    if (!el.tblServices) return;
+    const data = await jget(API.services());
+    el.tblServices.innerHTML = data.map(s => `
+      <tr>
+        <td>${h(s.title)}</td>
+        <td>${h(s.descr||"")}</td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-dark" data-act="del-service" data-id="${h(s.id)}">Löschen</button>
+        </td>
+      </tr>`).join("");
+  }
+  el.btnAddService?.addEventListener("click", async () => {
+    const title = prompt("Titel?");
+    const desc  = prompt("Beschreibung?");
+    if (!title) return;
+    try { await jpost(API.services(), { title, desc }); await loadServices(); showToast("Dienst angelegt"); }
+    catch { showToast("Dienst konnte nicht angelegt werden", false); }
+  });
+
+  // ---------- Requests ----------
+  async function loadRequests() {
+    if (!el.tblRequests) return;
+    const data = await jget(API.requests());
+    el.tblRequests.innerHTML = data.map(r => `
+      <tr>
+        <td>${h(r.user)}</td>
+        <td>${h(r.type)}</td>
+        <td>${h(r.prio)}</td>
+        <td>${h(r.due)}</td>
+        <td>${h(r.desc)}</td>
+        <td class="text-end">${h(r.status)}</td>
+      </tr>`).join("");
+  }
+  el.requestForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!el.requestForm.checkValidity()) { el.requestForm.classList.add("was-validated"); return; }
+    const payload = { user: currentUser, type: el.rqType?.value || "", prio: el.rqPrio?.value || "", due: el.rqDue?.value || "", desc: el.rqDesc?.value?.trim() || "" };
+    try { await jpost(API.requests(), payload); el.requestForm.reset(); el.requestForm.classList.remove("was-validated"); showToast("Anfrage gesendet!"); await loadRequests(); await renderActivity(); }
+    catch { showToast("Anfrage konnte nicht gespeichert werden", false); }
+  });
+
+  // ---------- Notes / Quick / Cats ----------
+  async function loadNotes() {
+    if (!el.deskNotes) return;
+    const list = await jget(API.notes());
+    el.deskNotes.innerHTML = list.map(n => `<div>• [${new Date(n.created_at).toLocaleString()}] ${h(n.author)}: ${h(n.text)}</div>`).join("");
+  }
+  el.btnAddNote?.addEventListener("click", async () => {
+    const txt = el.noteText?.value.trim(); if (!txt) return;
+    try { await jpost(API.notes(), { author: currentUser, text: txt }); el.noteText.value = ""; showToast("Notiz gespeichert"); await loadNotes(); await renderActivity(); }
+    catch { showToast("Notiz konnte nicht gespeichert werden", false); }
+  });
+
+  async function loadQuick() {
+    if (!el.quickList) return;
+    const list = await jget(API.quick());
+    el.quickList.innerHTML = list.map(q => `<div>• ${h(q.title)}: ${h(q.info)}</div>`).join("");
+  }
+  el.btnQuickAdd?.addEventListener("click", async () => {
+    const title = el.quickTitle?.value.trim(); const info  = el.quickInfo?.value.trim();
+    if (!title || !info) return;
+    try { await jpost(API.quick(), { title, info }); el.quickTitle.value=""; el.quickInfo.value=""; await loadQuick(); showToast("Ablage gespeichert"); }
+    catch { showToast("Ablage fehlgeschlagen", false); }
+  });
+
+  async function loadCats() {
+    if (!el.catList) return;
+    const cats = await jget(API.cats());
+    el.catList.innerHTML = cats.map(c => `<div class="col-6"><div class="ff-badge">${h(c.title)}</div></div>`).join("");
+  }
+  el.btnAddCategory?.addEventListener("click", async () => {
+    const title = el.catTitle?.value.trim(); if (!title) return;
+    try { await jpost(API.cats(), { title }); el.catTitle.value=""; await loadCats(); showToast("Kategorie hinzugefügt"); }
+    catch { showToast("Kategorie fehlgeschlagen", false); }
+  });
+
+  // ---------- Dateien ----------
+  async function loadFiles() {
+    if (!el.tblFiles) return;
+    const files = await jget(API.files());
+    el.tblFiles.innerHTML = files.map(f => `
+      <tr>
+        <td><a href="${h(f.url)}" target="_blank" rel="noopener">${h(f.name)}</a></td>
+        <td>${h(f.uploader || "-")}</td>
+        <td>${h(f.title || "")}</td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-dark" data-act="del-file" data-id="${h(f.id)}">Löschen</button>
+        </td>
+      </tr>`).join("");
+  }
+  el.btnUploadFile?.addEventListener("click", async () => {
+    const file = el.fileUpload?.files?.[0];
+    if (!file) { showToast("Bitte Datei wählen", false); return; }
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("title", el.fileTitle?.value || "");
+    try { await jpostForm(API.files(), fd); el.fileUpload.value = ""; if (el.fileTitle) el.fileTitle.value = ""; await loadFiles(); showToast("Datei hochgeladen"); }
+    catch (e) { console.error(e); showToast("Upload fehlgeschlagen", false); }
+  });
+
+  // ---------- Chat (Admin/Mitarbeiter/Kunde) ----------
+  const chatState = { admin: { since: "" }, team: { since: "" }, customer: { since: "" } };
+
+  const renderChat = (wrapEl, messages) => {
+    if (!wrapEl) return;
+    wrapEl.innerHTML = messages.map(m => `
+      <div class="chat-msg ${h(m.author===currentUser ? "me" : "")}">
+        <div class="avatar" title="${h(m.author)}"></div>
+        <div class="bubble">
+          <div>${h(m.text || "")}</div>
+          ${m.file_url ? `<div class="mt-1"><a href="${h(m.file_url)}" target="_blank" rel="noopener">📎 Anhang</a></div>` : ""}
+          <div class="meta">${h(m.author)} • ${new Date(m.created_at).toLocaleString()}</div>
+        </div>
+      </div>`).join("");
+    wrapEl.scrollTop = wrapEl.scrollHeight;
+  };
+
+  async function pollChat(room, wrapEl, stateKey) {
+    try {
+      const url = API.chat(room, chatState[stateKey].since);
+      const list = await jget(url);
+      if (Array.isArray(list) && list.length) {
+        chatState[stateKey].since = list[list.length-1].created_at;
+        // bei Polling: vorhandene DOM-Nachrichten nicht duplizieren → hier einfach neu rendern
+        const all = await jget(API.chat(room)); // einmal kompletter Stand
+        renderChat(wrapEl, all);
+      }
+    } catch (e) {
+      // leise – Polling soll nicht nerven
+    }
+  }
+
+  async function sendChat(room, text, fileInput) {
+    let fileId = "";
+    if (fileInput?.files?.[0]) {
+      const fd = new FormData();
+      fd.append("file", fileInput.files[0]);
+      const res = await jpostForm(API.files(), fd);
+      fileId = res?.id || "";
+    }
+    await jpost(API.chatPost(), { room, text, fileId });
+  }
+
+  // Events: Admin-Chat
+  el.chatAdminForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = el.chatAdminText?.value.trim(); if (!text && !el.chatAdminFile?.files?.length) return;
+    try { await sendChat("admin", text, el.chatAdminFile); el.chatAdminText.value=""; if (el.chatAdminFile) el.chatAdminFile.value=""; const all = await jget(API.chat("admin")); renderChat(el.chatAdmin, all); }
+    catch { showToast("Senden fehlgeschlagen", false); }
+  });
+
+  // Events: Team-Chat (Mitarbeiter)
+  el.chatTeamForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = el.chatTeamText?.value.trim(); if (!text && !el.chatTeamFile?.files?.length) return;
+    try { await sendChat("team", text, el.chatTeamFile); el.chatTeamText.value=""; if (el.chatTeamFile) el.chatTeamFile.value=""; const all = await jget(API.chat("team")); renderChat(el.chatTeam, all); }
+    catch { showToast("Senden fehlgeschlagen", false); }
+  });
+
+  // Events: Customer Messages
+  el.chatCustomerForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = el.chatCustomerText?.value.trim(); if (!text && !el.chatCustomerFile?.files?.length) return;
+    try { await sendChat("customer", text, el.chatCustomerFile); el.chatCustomerText.value=""; if (el.chatCustomerFile) el.chatCustomerFile.value=""; const all = await jget(API.chat("customer")); renderChat(el.chatCustomer, all); }
+    catch { showToast("Senden fehlgeschlagen", false); }
+  });
+
+  // ---------- Accounting ----------
+  async function loadInvoices() {
+    if (!el.tblInvoices) return;
+    const list = await jget(API.invoices());
+    el.tblInvoices.innerHTML = list.map(i => `
+      <tr>
+        <td>${h(i.number)}</td>
+        <td>${h(i.customer)}</td>
+        <td>${h(i.date)}</td>
+        <td>${h(i.amount)}</td>
+        <td>${h(i.status)}</td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-dark" data-act="del-invoice" data-id="${h(i.id)}">Löschen</button></td>
+      </tr>`).join("");
+  }
+  el.btnAddInvoice?.addEventListener("click", async () => {
+    const number = prompt("Rechnungsnummer?");
+    const customer = prompt("Kunde?");
+    const date = prompt("Datum (YYYY-MM-DD)?", new Date().toISOString().slice(0,10));
+    const amount = prompt("Betrag (z.B. 199.00)?");
+    if (!number || !customer || !date || !amount) return;
+    try { await jpost(API.invoices(), { number, customer, date, amount, status:"offen" }); await loadInvoices(); showToast("Rechnung angelegt"); }
+    catch { showToast("Rechnung fehlgeschlagen", false); }
+  });
+  el.btnExportInvoices?.addEventListener("click", async () => {
+    try { const rows = await jget(API.invoices()); downloadCSV(rows, "rechnungen.csv"); }
+    catch { showToast("Export fehlgeschlagen", false); }
+  });
+
+  async function loadReceipts() {
+    if (!el.tblReceipts) return;
+    const list = await jget(API.receipts());
+    el.tblReceipts.innerHTML = list.map(r => `
+      <tr>
+        <td>${h(r.date)}</td>
+        <td>${h(r.title)}</td>
+        <td>${h(r.amount)}</td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-dark" data-act="del-receipt" data-id="${h(r.id)}">Löschen</button></td>
+      </tr>`).join("");
+  }
+  el.btnAddReceipt?.addEventListener("click", async () => {
+    const title = el.receiptTitle?.value.trim();
+    const amount = Number(el.receiptAmount?.value);
+    if (!title || !amount) return;
+    try { await jpost(API.receipts(), { title, amount, date: new Date().toISOString().slice(0,10) }); el.receiptTitle.value=""; el.receiptAmount.value=""; await loadReceipts(); showToast("Beleg gespeichert"); }
+    catch { showToast("Beleg fehlgeschlagen", false); }
+  });
+
+  // Mitarbeiter Accounting Übersicht
+  async function loadAccountingOverview() {
+    if (!el.tblAccounting) return;
+    const [inv, rec] = await Promise.all([ jget(API.invoices()).catch(()=>[]), jget(API.receipts()).catch(()=>[]) ]);
+    const merged = [
+      ...inv.map(i => ({ type:"Rechnung", date:i.date, description:`#${i.number} ${i.customer}`, amount:i.amount })),
+      ...rec.map(r => ({ type:"Beleg", date:r.date, description:r.title, amount:r.amount })),
+    ].sort((a,b)=> (a.date>b.date? -1:1));
+    el.tblAccounting.innerHTML = merged.map(r => `
+      <tr><td>${h(r.type)}</td><td>${h(r.date)}</td><td>${h(r.description)}</td><td>${h(r.amount)}</td></tr>
+    `).join("");
+  }
+  el.btnAccLoad?.addEventListener("click", loadAccountingOverview);
+  el.btnAccExport?.addEventListener("click", async () => {
+    const [inv, rec] = await Promise.all([ jget(API.invoices()).catch(()=>[]), jget(API.receipts()).catch(()=>[]) ]);
+    downloadCSV([
+      ...inv.map(i => ({ typ:"Rechnung", datum:i.date, text:`#${i.number} ${i.customer}`, betrag:i.amount })),
+      ...rec.map(r => ({ typ:"Beleg", datum:r.date, text:r.title, betrag:r.amount })),
+    ], "buchhaltung.csv");
+  });
+
+  // ---------- Delete Delegation ----------
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-act]");
+    if (!btn) return;
+    const act = btn.getAttribute("data-act");
+    const id  = btn.getAttribute("data-id");
+    try {
+      if (act === "del-customer") { await jdel(`${API.customers()}?id=${encodeURIComponent(id)}`); await loadCustomers(); showToast("Kunde gelöscht"); }
+      else if (act === "del-service") { await jdel(`${API.services()}?id=${encodeURIComponent(id)}`); await loadServices(); showToast("Dienst gelöscht"); }
+      else if (act === "del-file") { await jdel(`${API.files()}?id=${encodeURIComponent(id)}`); await loadFiles(); showToast("Datei gelöscht"); }
+      else if (act === "del-invoice") { await jdel(`${API.invoices()}?id=${encodeURIComponent(id)}`); await loadInvoices(); showToast("Rechnung gelöscht"); }
+      else if (act === "del-receipt") { await jdel(`${API.receipts()}?id=${encodeURIComponent(id)}`); await loadReceipts(); showToast("Beleg gelöscht"); }
+    } catch { showToast("Löschen fehlgeschlagen", false); }
+  });
+
+  // ---------- Customer View ----------
+  async function renderCustomerView() {
+    if (!el.custContact || !el.custServices) return;
+    el.custContact.textContent = `${currentUser}@mail.com`;
+    const services = await jget(API.services()).catch(()=>[]);
+    el.custServices.innerHTML = services.map(s => `<li>${h(s.title)}</li>`).join("");
+  }
+
+  // ---------- Stats & Activity ----------
+  async function renderStats() {
+    const [customers, services, requests] = await Promise.all([
+      jget(API.customers()).catch(()=>[]),
+      jget(API.services()).catch(()=>[]),
+      jget(API.requests()).catch(()=>[])
+    ]);
+    const setKp = (k,v) => { const n = document.querySelector(`[data-kp='${k}']`); if (n) n.textContent = v; };
+    setKp("statCustomers", customers.length);
+    setKp("statServices",  services.length);
+    setKp("statRequests",  requests.length);
+  }
+  async function renderActivity() {
+    if (!el.adminActivity) return;
+    const [notes, reqs] = await Promise.all([ jget(API.notes()).catch(()=>[]), jget(API.requests()).catch(()=>[]) ]);
+    const ns = notes.map(n => ({ txt:`Notiz von ${n.author}: ${n.text}`, dateISO:n.created_at }));
+    const rs = reqs.map(r => ({ txt:`Anfrage von ${r.user}: ${r.type}`, dateISO:r.due || r.created_at }));
+    const all = [...ns, ...rs].sort((a,b)=> new Date(b.dateISO) - new Date(a.dateISO)).slice(0,5);
+    el.adminActivity.innerHTML = all.map(a => `<div>• ${new Date(a.dateISO).toLocaleString()}: ${h(a.txt)}</div>`).join("");
+  }
+
+  // ---------- Role Features Bootstrapping ----------
+  async function bootRoleFeatures() {
+    // Initial Chat-Loads + Polls (sanft)
+    if (currentRole === "admin") {
+      try { const all = await jget(API.chat("admin")); renderChat(el.chatAdmin, all); } catch {}
+      setInterval(()=> pollChat("admin", el.chatAdmin, "admin"), 3500);
+      // Admin kann auch Team sehen (optional: ausblenden, wenn du willst)
+      try { const allT = await jget(API.chat("team")); renderChat(el.chatTeam, allT); } catch {}
+      setInterval(()=> pollChat("team", el.chatTeam, "team"), 4000);
+    }
+    if (currentRole === "mitarbeiter") {
+      try { const allT = await jget(API.chat("team")); renderChat(el.chatTeam, allT); } catch {}
+      setInterval(()=> pollChat("team", el.chatTeam, "team"), 3500);
+    }
+    if (currentRole === "kunde") {
+      try { const allC = await jget(API.chat("customer")); renderChat(el.chatCustomer, allC); } catch {}
+      setInterval(()=> pollChat("customer", el.chatCustomer, "customer"), 4000);
+    }
+    // Accounting quick load
+    if (currentRole === "mitarbeiter") loadAccountingOverview().catch(()=>{});
+  }
+
+  // ---------- Render All ----------
+  async function renderAll() {
+    await Promise.all([
+      loadCustomers(), loadServices(), loadRequests(), loadNotes(),
+      loadQuick(), loadCats(), renderCustomerView(), renderStats(), renderActivity(),
+      loadFiles(), loadInvoices(), loadReceipts()
+    ].map(p => p.catch(()=>{}))); // Fehler nicht bremsen
+  }
+
+  // Periodischer Refresh für Admin (leicht)
+  setInterval(async () => {
+    if (currentRole === "admin" && !el.appView?.classList.contains("d-none")) {
+      await Promise.all([loadRequests(), loadNotes(), renderStats(), renderActivity()].map(p=>p.catch(()=>{})));
+    }
+  }, 3000);
+
+  // ---------- Theme ----------
+  function initTheme() {
+    const t = localStorage.getItem("ffportal:theme");
+    if (t === "dark") {
+      document.documentElement.classList.add("dark-mode");
+      if (el.darkToggle) el.darkToggle.textContent = "☀️ Light";
+    }
+  }
+  el.darkToggle?.addEventListener("click", () => {
+    document.documentElement.classList.toggle("dark-mode");
+    el.darkToggle.textContent = document.documentElement.classList.contains("dark-mode") ? "☀️ Light" : "🌙 Dark";
+    localStorage.setItem("ffportal:theme", document.documentElement.classList.contains("dark-mode") ? "dark" : "light");
+  });
+
+  // ---------- Boot ----------
+  initTheme();
+  checkSession();
+
+})();
+
+
